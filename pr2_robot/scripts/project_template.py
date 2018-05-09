@@ -162,60 +162,6 @@ def pcl_callback(pcl_msg):
     pcl_table_pub.publish(ros_cloud_table)
 
 
-# Exercise-3 TODOs:
-
-    # Classify the clusters!
-    detected_objects_labels = []
-    detected_objects = []
-
-    # loop through each detected cluster one at a time
-    for index, pts_list in enumerate(cluster_indices):
-
-        # Grab the points for the cluster
-        pcl_cluster = cloud_objects.extract(pts_list)
-        # TODO: convert the cluster from pcl to ROS using helper function
-        # ros_cluster is of type PointCloud2
-        ros_cluster = pcl_to_ros(pcl_cluster)
-
-        # Compute the associated feature vector
-        # Extract histogram features
-        chists = compute_color_histograms(ros_cluster, using_hsv=True)
-        normals = get_normals(ros_cluster)
-        nhists = compute_normal_histograms(normals)
-        feature = np.concatenate((chists, nhists))
-
-        # Make the prediction
-        prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
-        # retrieve the label for the result
-        label = encoder.inverse_transform(prediction)[0]
-        # and add it to detected_objects_labels list
-        detected_objects_labels.append(label)
-
-        # Publish a label into RViz
-        label_pos = list(white_cloud[pts_list[0]])
-        label_pos[2] += .4
-        object_markers_pub.publish(make_label(label, label_pos, index))
-
-        # Add the detected object to the list of detected objects.
-        do = DetectedObject()
-        do.label = label
-        do.cloud = ros_cluster
-        detected_objects.append(do)
-
-    rospy.loginfo('Detected {} objects: {}'.format(
-        len(detected_objects_labels), detected_objects_labels))
-
-    # Publish the list of detected objects
-    detected_objects_pub.publish(detected_objects)
-
-    # Suggested location for where to invoke your pr2_mover() function within pcl_callback()
-    # Could add some logic to determine whether or not your object detections are robust
-    # before calling pr2_mover()
-    try:
-        pr2_mover(detected_objects)
-    except rospy.ROSInterruptException:
-        pass
-
 # function to load parameters and request PickPlace service
 def pr2_mover(object_list):
 
@@ -241,12 +187,12 @@ def pr2_mover(object_list):
         rospy.wait_for_service('pick_place_routine')
 
         try:
-            pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+            #pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
 
             # TODO: Insert your message variables to be sent as a service request
-            resp = pick_place_routine(TEST_SCENE_NUM, OBJECT_NAME, WHICH_ARM, PICK_POSE, PLACE_POSE)
+            #resp = pick_place_routine(TEST_SCENE_NUM, OBJECT_NAME, WHICH_ARM, PICK_POSE, PLACE_POSE)
 
-            print ("Response: ",resp.success)
+            #print ("Response: ",resp.success)
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
@@ -276,9 +222,6 @@ if __name__ == '__main__':
                                       PointCloud2,
                                       queue_size=1)
 
-    pcl_cluster_pub = rospy.Publisher("/cam_data",
-                                    PointCloud2,
-                                    queue_size=1)
 
     # TODO: here you need to create two publishers
     # Call them object_markers_pub and detected_objects_pub
