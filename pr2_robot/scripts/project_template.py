@@ -78,10 +78,10 @@ def pcl_callback(pcl_msg):
     cloud_filtered = passthrough.filter()
 
     ##### Add statistical outliner filter
-    cloud_filtered = cloud_filtered.make_statistical_outlier_filter()
-    cloud_filtered.set_mean_k(3)
-    cloud_filtered.set_std_dev_mul_thresh(.1)
-    cloud_filtered = cloud_filtered.filter()
+    #cloud_filtered = cloud_filtered.make_statistical_outlier_filter()
+    #cloud_filtered.set_mean_k(3)
+    #cloud_filtered.set_std_dev_mul_thresh(.1)
+    #cloud_filtered = cloud_filtered.filter()
     #####
 
     # RANSAC Plane Segmentation
