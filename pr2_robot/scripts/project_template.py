@@ -52,115 +52,82 @@ def pcl_callback(pcl_msg):
 # Exercise-2 TODOs:
 
     # TODO: Convert ROS msg to PCL data
-    cloud = ros_to_pcl(pcl_msg)
+    pcl_data = ros_to_pcl(pcl_msg)
 
-    # Statistical Outlier Filter
-    #outlier_filter = cloud.make_statistical_outlier_filter()
-    #outlier_filter.set_mean_k(50)
-    #x = 1.0
-
-    # Any point with a mean distance larger than global (mean distance+x*std_dev) will be considered outlier
-    #outlier_filter.set_std_dev_mul_thresh(x)
-
-    # Finally call the filter function for magic
-    #cloud_filtered_outlier = outlier_filter.filter()
-
-    # Voxel Grid filter
-    vox = cloud.make_voxel_grid_filter()
-
-    # Choose a voxel (also known as leaf) size
-    # Note: this (1) is a poor choice of leaf size
-    # Experiment and find the appropriate size!
-    LEAF_SIZE = .01
-
-    # Set the voxel (or leaf) size
+    # Voxel Grid Downsampling
+    vox = pcl_data.make_voxel_grid_filter()
+    LEAF_SIZE = 0.005
     vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
+    cloud_filtered = vox.filter()
 
-    # Call the filter function to obtain the resultant downsampled point cloud
-    cloud_filtered_vox = vox.filter()
-
-    # PassThrough filter
-    # Create a PassThrough filter object.
-    passthrough = cloud_filtered_vox.make_passthrough_filter()
-
-    # Assign axis and range to the passthrough filter object.
+    # PassThrough Filter
+    passthrough = cloud_filtered.make_passthrough_filter()
     filter_axis = 'z'
-    passthrough.set_filter_field_name(filter_axis)
-    axis_min = 0.6
-    axis_max = 1.1
-    passthrough.set_filter_limits(axis_min, axis_max)
+    passthrough.set_filter_field_name (filter_axis)
+    axis_min = 0.5
+    axis_max = 0.8
+    passthrough.set_filter_limits (axis_min, axis_max)
+    cloud_filtered = passthrough.filter()
 
-    # Finally use the filter function to obtain the resultant point cloud.
-    cloud_filtered_passthrough = passthrough.filter()
+    passthrough = cloud_filtered.make_passthrough_filter()
+    filter_axis = 'x'
+    passthrough.set_filter_field_name (filter_axis)
+    axis_min = 0.4
+    axis_max = 0.8
+    passthrough.set_filter_limits (axis_min, axis_max)
+    cloud_filtered = passthrough.filter()
 
-    # RANSAC plane segmentation
-    # Create the segmentation object
-    seg = cloud_filtered_passthrough.make_segmenter()
+    ##### Add statistical outliner filter
+    cloud_filtered = cloud_filtered.make_statistical_outlier_filter()
+    cloud_filtered.set_mean_k(3)
+    cloud_filtered.set_std_dev_mul_thresh(.1)
+    cloud_filtered = cloud_filtered.filter()
+    #####
 
-    # Set the model you wish to fit
+    # RANSAC Plane Segmentation
+    seg = cloud_filtered.make_segmenter()
     seg.set_model_type(pcl.SACMODEL_PLANE)
     seg.set_method_type(pcl.SAC_RANSAC)
-
-    # Max distance for a point to be considered fitting the model
-    # Experiment with different values for max_distance
-    # for segmenting the table
-    max_distance = .01
+    max_distance = 0.01
     seg.set_distance_threshold(max_distance)
-
-    # Call the segment function to obtain set of inlier indices and model coefficients
     inliers, coefficients = seg.segment()
 
-    # Extract inliers
-    cloud_table = cloud_filtered_passthrough.extract(inliers, negative=False)
+    # Extract inliers and outliers
+    cloud_table = cloud_filtered.extract(inliers, negative=False)
+    cloud_objects = cloud_filtered.extract(inliers, negative=True)
 
-    # Extract outliers
-    cloud_objects = cloud_filtered_passthrough.extract(inliers, negative=True)
-
-    # TODO: Euclidean Clustering
-    white_cloud = XYZRGB_to_XYZ(cloud_objects)
+    # Euclidean Clustering
+    white_cloud = XYZRGB_to_XYZ(cloud_objects)# Apply function to convert XYZRGB to XYZ
     tree = white_cloud.make_kdtree()
-
-    # Create a cluster extraction object
     ec = white_cloud.make_EuclideanClusterExtraction()
-    # Set tolerances for distance threshold
-    # as well as minimum and maximum cluster size (in points)
-    # NOTE: These are poor choices of clustering parameters
-    # Your task is to experiment and find values that work for segmenting objects.
-    ec.set_ClusterTolerance(0.02)
-    ec.set_MinClusterSize(20)
-    ec.set_MaxClusterSize(2000)
-    # Search the k-d tree for clusters
+    ec.set_ClusterTolerance(0.007)
+    ec.set_MinClusterSize(30)
+    ec.set_MaxClusterSize(3000)
     ec.set_SearchMethod(tree)
-    # Extract indices for each of the discovered clusters
     cluster_indices = ec.Extract()
 
-    # TODO: Create Cluster-Mask Point Cloud to visualize each cluster separately
-    #Assign a color corresponding to each segmented object in scene
+    # Create Cluster-Mask Point Cloud to visualize each cluster separately
     cluster_color = get_color_list(len(cluster_indices))
-
     color_cluster_point_list = []
-
     for j, indices in enumerate(cluster_indices):
         for i, indice in enumerate(indices):
             color_cluster_point_list.append([white_cloud[indice][0],
-                                             white_cloud[indice][1],
-                                             white_cloud[indice][2],
-                                             rgb_to_float(cluster_color[j])])
+                                        white_cloud[indice][1],
+                                        white_cloud[indice][2],
+                                         rgb_to_float(cluster_color[j])])
 
-    #Create new cloud containing all clusters, each with unique color
     cluster_cloud = pcl.PointCloud_PointXYZRGB()
     cluster_cloud.from_list(color_cluster_point_list)
 
-    # TODO: Convert PCL data to ROS messages
+    # Convert PCL data to ROS messages
+    ros_cloud_table =  pcl_to_ros(cloud_table)
     ros_cloud_objects = pcl_to_ros(cloud_objects)
-    ros_cloud_table = pcl_to_ros(cloud_table)
     ros_cluster_cloud = pcl_to_ros(cluster_cloud)
 
-    # TODO: Publish ROS messages
-    pcl_cluster_pub.publish(ros_cluster_cloud)
+    # Publish ROS messages
     pcl_objects_pub.publish(ros_cloud_objects)
     pcl_table_pub.publish(ros_cloud_table)
-
+    pcl_cluster_pub.publish(ros_cluster_cloud)
 
 # function to load parameters and request PickPlace service
 #def pr2_mover(object_list):
