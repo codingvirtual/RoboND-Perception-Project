@@ -55,18 +55,18 @@ def pcl_callback(pcl_msg):
     cloud = ros_to_pcl(pcl_msg)
 
     # Statistical Outlier Filter
-    outlier_filter = cloud.make_statistical_outlier_filter()
-    outlier_filter.set_mean_k(50)
-    x = 1.0
+    #outlier_filter = cloud.make_statistical_outlier_filter()
+    #outlier_filter.set_mean_k(50)
+    #x = 1.0
 
     # Any point with a mean distance larger than global (mean distance+x*std_dev) will be considered outlier
-    outlier_filter.set_std_dev_mul_thresh(x)
+    #outlier_filter.set_std_dev_mul_thresh(x)
 
     # Finally call the filter function for magic
-    cloud_filtered_outlier = outlier_filter.filter()
+    #cloud_filtered_outlier = outlier_filter.filter()
 
     # Voxel Grid filter
-    vox = cloud_filtered_outlier.make_voxel_grid_filter()
+    vox = cloud.make_voxel_grid_filter()
 
     # Choose a voxel (also known as leaf) size
     # Note: this (1) is a poor choice of leaf size
