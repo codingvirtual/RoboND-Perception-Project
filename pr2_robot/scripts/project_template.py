@@ -54,8 +54,19 @@ def pcl_callback(pcl_msg):
     # TODO: Convert ROS msg to PCL data
     cloud = ros_to_pcl(pcl_msg)
 
+    # Statistical Outlier Filter
+    outlier_filter = cloud_filtered.make_statistical_outlier_filter()
+    outlier_filter.set_mean_k(50)
+    x = 1.0
+
+    # Any point with a mean distance larger than global (mean distance+x*std_dev) will be considered outlier
+    outlier_filter.set_std_dev_mul_thresh(x)
+
+    # Finally call the filter function for magic
+    cloud_filtered_outlier = outlier_filter.filter()
+
     # Voxel Grid filter
-    vox = cloud.make_voxel_grid_filter()
+    vox = cloud_filtered_outlier.make_voxel_grid_filter()
 
     # Choose a voxel (also known as leaf) size
     # Note: this (1) is a poor choice of leaf size
@@ -66,25 +77,25 @@ def pcl_callback(pcl_msg):
     vox.set_leaf_size(LEAF_SIZE, LEAF_SIZE, LEAF_SIZE)
 
     # Call the filter function to obtain the resultant downsampled point cloud
-    cloud_filtered = vox.filter()
+    cloud_filtered_vox = vox.filter()
 
     # PassThrough filter
     # Create a PassThrough filter object.
-    passthrough = cloud_filtered.make_passthrough_filter()
+    passthrough = cloud_filtered_vox.make_passthrough_filter()
 
     # Assign axis and range to the passthrough filter object.
     filter_axis = 'z'
     passthrough.set_filter_field_name(filter_axis)
-    axis_min = 0.77
+    axis_min = 0.6
     axis_max = 1.1
     passthrough.set_filter_limits(axis_min, axis_max)
 
     # Finally use the filter function to obtain the resultant point cloud.
-    cloud_filtered = passthrough.filter()
+    cloud_filtered_passthrough = passthrough.filter()
 
     # RANSAC plane segmentation
     # Create the segmentation object
-    seg = cloud_filtered.make_segmenter()
+    seg = cloud_filtered_passthrough.make_segmenter()
 
     # Set the model you wish to fit
     seg.set_model_type(pcl.SACMODEL_PLANE)
@@ -100,10 +111,10 @@ def pcl_callback(pcl_msg):
     inliers, coefficients = seg.segment()
 
     # Extract inliers
-    cloud_table = cloud_filtered.extract(inliers, negative=False)
+    cloud_table = cloud_filtered_passthrough.extract(inliers, negative=False)
 
     # Extract outliers
-    cloud_objects = cloud_filtered.extract(inliers, negative=True)
+    cloud_objects = cloud_filtered_passthrough.extract(inliers, negative=True)
 
     # TODO: Euclidean Clustering
     white_cloud = XYZRGB_to_XYZ(cloud_objects)
