@@ -55,7 +55,7 @@ def pcl_callback(pcl_msg):
     cloud = ros_to_pcl(pcl_msg)
 
     # Statistical Outlier Filter
-    outlier_filter = cloud_filtered.make_statistical_outlier_filter()
+    outlier_filter = cloud.make_statistical_outlier_filter()
     outlier_filter.set_mean_k(50)
     x = 1.0
 
